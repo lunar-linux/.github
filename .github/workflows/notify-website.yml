@@ -13,15 +13,18 @@
 #       uses: lunar-linux/.github/.github/workflows/notify-website.yml@v1
 #       secrets: inherit
 #
-# Needs the org secret MOONBASE_DISPATCH_TOKEN: a token that may send dispatches to lunar-web
-# (fine-grained, lunar-web only, Contents: read and write). Without it, this does nothing and the
-# website still picks up changes within the hour.
+# Signs in as the organization's "Lunar website notifier" GitHub App, installed on lunar-web only:
+#   - org variable MOONBASE_APP_CLIENT_ID: the App's Client ID (not secret)
+#   - org secret MOONBASE_APP_PRIVATE_KEY: the App's private key (.pem)
+# Each run gets a token that lasts an hour and can only write lunar-web's contents (which is what
+# sending a dispatch requires). Without them this does nothing and the website still refreshes
+# within the hour.
 name: Notify website
 
 on:
   workflow_call:
     secrets:
-      MOONBASE_DISPATCH_TOKEN:
+      MOONBASE_APP_PRIVATE_KEY:
         required: false
 
 permissions: {}
@@ -29,16 +32,30 @@ permissions: {}
 jobs:
   notify:
     runs-on: ubuntu-latest
+    env:
+      CONFIGURED: ${{ vars.MOONBASE_APP_CLIENT_ID != '' && secrets.MOONBASE_APP_PRIVATE_KEY != '' }}
     steps:
+      - name: Not set up yet
+        if: env.CONFIGURED != 'true'
+        run: echo "::notice::The website notifier app isn't set up for this repository; the website refreshes within the hour anyway."
+
+      - name: Sign in as the website notifier app
+        id: app
+        if: env.CONFIGURED == 'true'
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.MOONBASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MOONBASE_APP_PRIVATE_KEY }}
+          owner: lunar-linux
+          repositories: lunar-web
+          permission-contents: write
+
       - name: Send moonbase-updated to lunar-web
+        if: env.CONFIGURED == 'true'
         env:
-          GH_TOKEN: ${{ secrets.MOONBASE_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           SOURCE: ${{ github.repository }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::notice::MOONBASE_DISPATCH_TOKEN isn't available here; the website refreshes within the hour anyway."
-            exit 0
-          fi
           gh api repos/lunar-linux/lunar-web/dispatches \
             -f event_type=moonbase-updated \
             -f "client_payload[repository]=$SOURCE"

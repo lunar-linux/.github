@@ -11,6 +11,12 @@ Organization-wide files for [Lunar Linux](https://github.com/lunar-linux) on Git
 | --- | --- | --- |
 | [`notify-website.yml`](.github/workflows/notify-website.yml) | moonbase repositories, on push to `master` | Tells `lunar-web` that modules changed, so the homepage's arrivals board refreshes |
 
+`notify-website.yml` signs in as the organization's **Lunar website notifier** GitHub App, which is
+installed on `lunar-web` only. It needs the org variable `MOONBASE_APP_CLIENT_ID` (the App's Client
+ID) and the org secret `MOONBASE_APP_PRIVATE_KEY` (its private key), both available to the moonbase
+repositories. Without them it does nothing; see "Live moonbase arrivals" in the
+[lunar-web README](https://github.com/lunar-linux/lunar-web#live-moonbase-arrivals).
+
 Call them by tag, for example `uses: lunar-linux/.github/.github/workflows/notify-website.yml@v1`.
 Compatible changes move the `v1` tag (`git tag -f v1 && git push -f origin v1`); a breaking change
 gets a new major tag.
